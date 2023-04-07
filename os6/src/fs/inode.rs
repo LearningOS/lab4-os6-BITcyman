@@ -9,6 +9,7 @@ use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
 use super::File;
+use super::{Stat,StatMode};
 use crate::mm::UserBuffer;
 
 /// A wrapper around a filesystem inode
@@ -56,6 +57,8 @@ impl OSInode {
         }
         v
     }
+
+    
 }
 
 lazy_static! {
@@ -166,4 +169,34 @@ impl File for OSInode {
         }
         total_write_size
     }
+    fn fstat(&self) ->  (u64, StatMode, u32){
+        let inode = self.inner.exclusive_access().inode.clone();
+        let inode_id = inode.get_id() as u64;
+        let mut stat_mode = StatMode::FILE;
+        if inode.is_dir() {
+            stat_mode = StatMode::DIR;
+        }
+        let nlink = ROOT_INODE.nlink(&inode);
+        return (inode_id, stat_mode, nlink);
+    }
 }
+
+
+pub fn linkat(old_name: &str, new_name:&str) -> isize{
+    if let Some(inode) = ROOT_INODE.find(old_name) {
+        let inode_id = inode.get_id() as u32;
+        ROOT_INODE.create_link(inode_id, new_name)
+    } else {
+        return -1;
+    }
+}
+
+
+pub fn unlinkat(name: &str) -> isize {
+    if let Some(inode) = ROOT_INODE.find(name) {
+        ROOT_INODE.remove(name)
+    } else {
+        return -1
+    }
+}
+
